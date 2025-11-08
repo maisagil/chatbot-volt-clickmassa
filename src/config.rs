@@ -1,102 +1,80 @@
-use crate::error::{AppError, AppResult};
-use serde::Deserialize;
 use std::env;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Config {
-    // Servidor
+    pub environment: String,
     pub host: String,
     pub port: u16,
-    pub environment: String,
-
-    // V8 Sistema - URLs e credenciais (dinâmicas conforme ambiente)
+    
+    // V8
     pub v8_auth_url: String,
     pub v8_base_url: String,
     pub v8_client_id: String,
+    pub v8_client_secret: String,
     pub v8_username: String,
     pub v8_password: String,
     pub v8_audience: String,
     pub v8_config_id: String,
     pub v8_provider: String,
-
+    
     // APIs Externas
     pub highconsult_api_url: String,
     pub viacep_api_url: String,
-
+    
     // Cache
     pub token_cache_ttl_seconds: u64,
-
+    
     // Logging
     pub rust_log: String,
-
-    // API Key (opcional)
-    pub api_key: Option<String>,
 }
 
 impl Config {
-    pub fn from_env() -> AppResult<Self> {
-        // Carregar variáveis de ambiente
-        dotenvy::dotenv().ok();
-
-        let environment = env::var("ENVIRONMENT")
-            .unwrap_or_else(|_| "staging".to_string())
-            .to_lowercase();
-
-        // Construir sufixo das variáveis conforme ambiente
-        let suffix = if environment == "production" {
-            "_PROD".to_string()
-        } else {
-            "_STAGING".to_string()
-        };
-
-        // Função auxiliar para buscar variáveis com erro customizado
-        let get_var = |key: &str| -> AppResult<String> {
-            env::var(key).map_err(|_| {
-                AppError::ConfigError(format!("Variável de ambiente não encontrada: {}", key))
-            })
-        };
-
-        let config = Config {
-            // Servidor
+    pub fn from_env() -> Result<Self, String> {
+        let environment = env::var("ENVIRONMENT").unwrap_or_else(|_| "staging".to_string());
+        
+        Ok(Config {
+            environment: environment.clone(),
             host: env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
             port: env::var("PORT")
                 .unwrap_or_else(|_| "3000".to_string())
                 .parse()
-                .map_err(|_| AppError::ConfigError("PORT deve ser um número".to_string()))?,
-            environment: environment.clone(),
-
-            // V8 Sistema
-            v8_auth_url: get_var(&format!("V8_AUTH_URL{}", suffix))?,
-            v8_base_url: get_var(&format!("V8_BASE_URL{}", suffix))?,
-            v8_client_id: get_var(&format!("V8_CLIENT_ID{}", suffix))?,
-            v8_username: get_var(&format!("V8_USERNAME{}", suffix))?,
-            v8_password: get_var(&format!("V8_PASSWORD{}", suffix))?,
-            v8_audience: get_var(&format!("V8_AUDIENCE{}", suffix))?,
-            v8_config_id: get_var("V8_CONFIG_ID")?,
-            v8_provider: env::var("V8_PROVIDER").unwrap_or_else(|_| "QI".to_string()),
-
+                .map_err(|_| "PORT deve ser um número".to_string())?,
+            
+            // V8 - Ler direto (sem sufixo)
+            v8_auth_url: env::var("V8_AUTH_URL")
+                .map_err(|_| "V8_AUTH_URL não configurada".to_string())?,
+            v8_base_url: env::var("V8_BASE_URL")
+                .map_err(|_| "V8_BASE_URL não configurada".to_string())?,
+            v8_client_id: env::var("V8_CLIENT_ID")
+                .map_err(|_| "V8_CLIENT_ID não configurada".to_string())?,
+            v8_client_secret: env::var("V8_CLIENT_SECRET")
+                .map_err(|_| "V8_CLIENT_SECRET não configurada".to_string())?,
+            v8_username: env::var("V8_USERNAME")
+                .map_err(|_| "V8_USERNAME não configurada".to_string())?,
+            v8_password: env::var("V8_PASSWORD")
+                .map_err(|_| "V8_PASSWORD não configurada".to_string())?,
+            v8_audience: env::var("V8_AUDIENCE")
+                .map_err(|_| "V8_AUDIENCE não configurada".to_string())?,
+            v8_config_id: env::var("V8_CONFIG_ID")
+                .map_err(|_| "V8_CONFIG_ID não configurada".to_string())?,
+            v8_provider: env::var("V8_PROVIDER")
+                .map_err(|_| "V8_PROVIDER não configurada".to_string())?,
+            
             // APIs Externas
-            highconsult_api_url: get_var("HIGHCONSULT_API_URL")?,
-            viacep_api_url: get_var("VIACEP_API_URL")?,
-
+            highconsult_api_url: env::var("HIGHCONSULT_API_URL")
+                .unwrap_or_else(|_| "https://telefone.highconsult.net".to_string()),
+            viacep_api_url: env::var("VIACEP_API_URL")
+                .unwrap_or_else(|_| "https://viacep.com.br/ws".to_string()),
+            
             // Cache
             token_cache_ttl_seconds: env::var("TOKEN_CACHE_TTL_SECONDS")
                 .unwrap_or_else(|_| "3600".to_string())
                 .parse()
-                .map_err(|_| {
-                    AppError::ConfigError(
-                        "TOKEN_CACHE_TTL_SECONDS deve ser um número".to_string(),
-                    )
-                })?,
-
+                .unwrap_or(3600),
+            
             // Logging
             rust_log: env::var("RUST_LOG")
-                .unwrap_or_else(|_| "info,chatbot_volt_clickmassa=debug".to_string()),
-
-            // API Key
-            api_key: env::var("API_KEY").ok(),
-        };
-
-        Ok(config)
+                .unwrap_or_else(|_| "info".to_string()),
+        })
     }
 }

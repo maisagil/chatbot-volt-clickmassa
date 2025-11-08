@@ -81,6 +81,15 @@ async fn main() {
     let viacep_client =
         clients::viacep_client::ViaCepClient::new(config.viacep_api_url.clone());
 
+        // Configurar CORS
+    let cors = if config.environment == "production" {
+        // CORS restritivo em produção
+        CorsLayer::very_permissive() // TODO: Depois fazer whitelist
+    } else {
+        // CORS permissivo em desenvolvimento
+        CorsLayer::permissive()
+    };
+
     // Construir a aplicação
      let app = Router::new()
         .merge(routes::routes())
