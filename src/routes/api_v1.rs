@@ -30,7 +30,7 @@ pub fn v1_routes(
             enrichment_service: enrichment_service.clone(),
         }))
         .merge(termo::termo_routes(termo::TermoState {
-            termo_service,
+            termo_service: termo_service.clone(),  
             enrichment_service: enrichment_service.clone(),
         }))
         .merge(simulacao::simulacao_routes(simulacao::SimulacaoState {
@@ -39,6 +39,7 @@ pub fn v1_routes(
         .merge(proposta::proposta_routes(proposta::PropostaState {
             proposta_service,
             enrichment_service,
+            termo_service: termo_service.clone(), 
         }))
-        .merge(pix::pix_routes()) 
+        .merge(pix::pix_routes())
 }

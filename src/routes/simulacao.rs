@@ -32,6 +32,7 @@ pub fn simulacao_routes(state: SimulacaoState) -> Router {
 #[utoipa::path(
     post,
     path = "/simulacao/gerar",
+    context_path = "/api/v1", 
     request_body = GerarSimulacoesRequest,
     responses(
         (

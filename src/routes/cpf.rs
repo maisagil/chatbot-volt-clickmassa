@@ -86,6 +86,7 @@ pub async fn validar_cpf(
 #[utoipa::path(
     post,
     path = "/cpf/consultar",
+    context_path = "/api/v1", 
     request_body = ConsultaCpfRequest,
     responses(
         (

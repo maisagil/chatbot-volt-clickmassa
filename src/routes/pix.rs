@@ -23,6 +23,7 @@ pub fn pix_routes() -> Router {
 #[utoipa::path(
     post,
     path = "/pix/validar",
+    context_path = "/api/v1", 
     request_body = ValidarPixRequest,
     responses(
         (

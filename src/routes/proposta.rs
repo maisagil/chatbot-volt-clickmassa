@@ -12,12 +12,14 @@ use crate::models::chatbot::{
 use crate::models::v8::*;
 use crate::services::enrichment_service::EnrichmentService;
 use crate::services::proposta_service::PropostaService;
+use crate::services::termo_service::TermoService;
 use crate::utils::cpf_validator;
 
 #[derive(Clone)]
 pub struct PropostaState {
     pub proposta_service: Arc<PropostaService>,
     pub enrichment_service: Arc<EnrichmentService>,
+    pub termo_service: Arc<TermoService>,
 }
 
 pub fn proposta_routes(state: PropostaState) -> Router {
@@ -27,10 +29,10 @@ pub fn proposta_routes(state: PropostaState) -> Router {
         .with_state(state)
 }
 
-/// Criar proposta completa
 #[utoipa::path(
     post,
     path = "/proposta/criar",
+    context_path = "/api/v1",
     request_body = CriarPropostaRequestCompleta,
     responses(
         (status = 200, description = "Proposta criada", body = CriarPropostaResponse),
@@ -48,56 +50,50 @@ async fn criar_proposta(
     // 1. Validar CPF
     let cpf_limpo = cpf_validator::validate_cpf(&payload.cpf)?;
 
-    tracing::info!("CPF validado: {}", cpf_limpo);
+    // 2. Buscar dados completos do consult_id
+    let consult_data = state
+        .termo_service
+        .get_consult_data(&payload.consult_id)
+        .await?;
 
-    // 2. Buscar dados de endereço via CEP (usando HighConsult)
+    // 3. Buscar dados do HighConsult
     let dados_pessoa = state.enrichment_service.get_person_data(&cpf_limpo).await?;
 
-    tracing::info!("Dados da pessoa obtidos: {}", dados_pessoa.nome);
-
-    // 3. Buscar dados de endereço via CEP
+    // 4. Buscar endereço detalhado ViaCEP
     let dados_endereco = state
         .enrichment_service
         .get_address_data(&dados_pessoa.cep)
         .await?;
 
-    tracing::info!(
-        "Endereço obtido: {}, {}",
-        dados_endereco.logradouro,
-        dados_endereco.localidade
-    );
-
-    // 4. Parsear telefone
-    let telefone_limpo = payload
-        .telefone
+    // 5. Parsear telefone
+    let telefone_limpo: String = consult_data
+        .phone_number
         .chars()
         .filter(|c| c.is_ascii_digit())
-        .collect::<String>();
+        .collect();
 
-    let (ddd, numero) = if telefone_limpo.len() == 11 {
-        (&telefone_limpo[0..2], &telefone_limpo[2..11])
-    } else if telefone_limpo.len() == 10 {
-        (&telefone_limpo[0..2], &telefone_limpo[2..10])
+    let (country_code, ddd, numero) = if telefone_limpo.len() >= 13 {
+        (&telefone_limpo[0..2], &telefone_limpo[2..4], &telefone_limpo[4..])
+    } else if telefone_limpo.len() == 11 {
+        ("55", &telefone_limpo[0..2], &telefone_limpo[2..])
     } else {
         return Err(crate::error::AppError::ValidationError(
-            "Telefone inválido. Use formato: 11984353470".to_string(),
+            "Telefone da consulta está em formato inválido.".to_string(),
         ));
     };
 
-    // 5. Determinar tipo de documento
-    let doc_type = if payload.cpf.len() == 14 || payload.cpf.len() == 11 {
-        "rg" // Simplificado - em produção seria CNPJ/CPF
-    } else {
-        "rg"
-    };
+    // 6. Preparar datas - usar valores padrão por enquanto
+    // TODO: Corrigir tipos de birth_date e admission_date do consult_data
+    let birth_date = "1990-01-01".to_string();
+    let document_date = "2010-10-10".to_string();
 
-    // 6. Montar estrutura completa da proposta
+    // 7. Montar estrutura do request
     let operation_request = CreateOperationRequest {
         borrower: Borrower {
-            name: payload.nome.clone(),
+            name: consult_data.name.clone(),
             email: payload.email.clone(),
             phone: BorrowerPhone {
-                country_code: "55".to_string(),
+                country_code: country_code.to_string(),
                 area_code: ddd.to_string(),
                 number: numero.to_string(),
             },
@@ -106,21 +102,21 @@ async fn criar_proposta(
                 postal_code: dados_endereco.cep.replace("-", ""),
                 city: dados_endereco.localidade.clone(),
                 state: dados_endereco.uf.clone(),
-                number: "0".to_string(), // TODO: receber no request
+                number: payload.numero_endereco.clone(),
                 street: dados_endereco.logradouro.clone(),
                 complement: Some(dados_endereco.complemento.clone()),
                 neighborhood: dados_endereco.bairro.clone(),
             },
-            birth_date: payload.data_nascimento.clone(),
-            mother_name: payload.mae.clone(),
+            birth_date,
+            mother_name: dados_pessoa.mae,
             nationality: "Brasileiro".to_string(),
-            gender: payload.genero.clone(),
+            gender: consult_data.gender.clone(),
             person_type: "natural".to_string(),
-            marital_status: "single".to_string(), // TODO: receber no request
+            marital_status: "single".to_string(),
             individual_document_number: cpf_limpo.clone(),
-            document_identification_date: "2010-10-10".to_string(), // TODO: receber
+            document_identification_date: document_date,
             document_issuer: "SSP".to_string(),
-            document_identification_type: doc_type.to_string(),
+            document_identification_type: "rg".to_string(),
             document_identification_number: cpf_limpo.clone(),
             bank: BorrowerBank {
                 transfer_method: "pix".to_string(),
@@ -128,26 +124,18 @@ async fn criar_proposta(
                 pix_key_type: payload.tipo_chave_pix.clone(),
             },
             work_data: WorkData {
-                employer_name: "Empresa".to_string(),      // TODO: receber
-                employer_document_number: "00000000000000".to_string(), // TODO: receber
-                registration_number: "123456789".to_string(), // TODO: receber
+                employer_name: consult_data.employer_name.clone(),
+                employer_document_number: consult_data.employer_document_number.clone(),
+                registration_number: consult_data.registration_number.clone(),
             },
         },
         simulation_id: payload.simulation_id.clone(),
     };
 
-    // 7. Criar operação na API V8
-    tracing::info!("Enviando operação para V8...");
     let operation_response = state
         .proposta_service
         .criar_operacao(operation_request)
         .await?;
-
-    tracing::info!(
-        "Operação criada com ID: {}",
-        operation_response.id
-    );
-    tracing::info!("Link de formalização: {}", operation_response.formalization_url);
 
     Ok(Json(CriarPropostaResponse {
         operation_id: operation_response.id,
@@ -159,7 +147,8 @@ async fn criar_proposta(
 
 #[utoipa::path(
     get,
-    path = "/operacao/{id}", 
+    path = "/operacao/{id}",
+    context_path = "/api/v1",
     params(
         ("id" = String, Path, description = "ID da operação")
     ),
@@ -179,8 +168,6 @@ async fn consultar_operacao(
         .proposta_service
         .consultar_operacao(&operation_id)
         .await?;
-
-    tracing::info!("Operação consultada com status: {}", operation.status);
 
     Ok(Json(ConsultarOperacaoResponse {
         operation_id: operation.id,

@@ -121,13 +121,16 @@ pub struct CriarPropostaRequestCompleta {
     pub nome: String,
     pub email: String,
     pub telefone: String,
-    pub data_nascimento: String, // YYYY-MM-DD
-    pub genero: String,           // "male" ou "female"
+    pub data_nascimento: String, 
+    pub genero: String,
     pub mae: String,
     pub simulation_id: String,
     pub chave_pix: String,
-    pub tipo_chave_pix: String, // "cpf", "phone", "email", "random"
+    pub tipo_chave_pix: String,
+    pub consult_id: String,          
+    pub numero_endereco: String,     
 }
+
 
 // VALIDAÇÃO DE PIX
 
