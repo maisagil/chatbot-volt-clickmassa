@@ -37,6 +37,7 @@ pub fn cpf_routes(state: CpfState) -> Router {
 #[utoipa::path(
     post,
     path = "/cpf/validar",
+    context_path = "/api/v1", 
     request_body = ValidarCpfRequest,
     responses(
         (

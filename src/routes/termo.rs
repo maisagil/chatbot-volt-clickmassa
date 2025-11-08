@@ -32,6 +32,7 @@ pub fn termo_routes(state: TermoState) -> Router {
 #[utoipa::path(
     post,
     path = "/termo/criar",
+    context_path = "/api/v1", 
     request_body = CriarTermoRequest,
     responses(
         (status = 200, description = "Termo criado com sucesso", body = CriarTermoResponse),
@@ -100,6 +101,7 @@ async fn criar_termo(
 #[utoipa::path(
     post,
     path = "/termo/autorizar",
+    context_path = "/api/v1", 
     request_body = AutorizarTermoRequest,
     responses(
         (status = 200, description = "Termo autorizado com sucesso", body = AutorizarTermoResponse),

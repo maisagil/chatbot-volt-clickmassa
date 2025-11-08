@@ -1,5 +1,0 @@
-[build]
-cmds = ["cargo build --release"]
-
-[start]
-cmd = "chatbot-volt-clickmassa"
