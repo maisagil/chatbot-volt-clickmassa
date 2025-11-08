@@ -20,14 +20,43 @@ pub fn simulacao_routes(state: SimulacaoState) -> Router {
         .with_state(state)
 }
 
-/// POST /simulacao/gerar
-/// Gera múltiplas simulações com diferentes parcelamentos
+/// Gerar simulações de crédito
+/// 
+/// Gera múltiplas simulações com diferentes parcelamentos (6, 8, 10, 12, 18, 24 parcelas)
+/// baseado no ID da consulta autorizada
+/// 
+/// **Fluxo obrigatório anterior:**
+/// 1. POST `/api/v1/termo/criar` - Criar termo
+/// 2. POST `/api/v1/termo/autorizar` - Autorizar e receber `consult_id`
+/// 3. POST `/api/v1/simulacao/gerar` - Gerar simulações
+#[utoipa::path(
+    post,
+    path = "/simulacao/gerar",
+    request_body = GerarSimulacoesRequest,
+    responses(
+        (
+            status = 200,
+            description = "Simulações geradas com sucesso",
+            body = GerarSimulacoesResponse,
+            content_type = "application/json"
+        ),
+        (
+            status = 400,
+            description = "Erro de validação - consult_id inválido"
+        ),
+        (
+            status = 502,
+            description = "Erro na comunicação com API V8"
+        )
+    ),
+    tag = "simulacao"
+)]
 async fn gerar_simulacoes(
     State(state): State<SimulacaoState>,
     Json(payload): Json<GerarSimulacoesRequest>,
 ) -> AppResult<Json<GerarSimulacoesResponse>> {
     tracing::info!(
-        "💰 Gerando simulações para consult_id: {}",
+        "Gerando simulações para consult_id: {}",
         payload.consult_id
     );
 
@@ -35,7 +64,7 @@ async fn gerar_simulacoes(
     // TODO: Implementar busca de dados se necessário
 
     // 2. Gerar simulações (6, 8, 10, 12, 18, 24 parcelas)
-    let valor_base = 1000.0; // TODO: receber como parâmetro
+    let valor_base: f64 = 1000.0; // TODO: receber como parâmetro
 
     let simulacoes_v8 = state
         .simulacao_service
@@ -61,9 +90,15 @@ async fn gerar_simulacoes(
         })
         .collect();
 
+        let count = simulacoes_resumo.len();
+    
     Ok(Json(GerarSimulacoesResponse {
         simulacoes: simulacoes_resumo,
         status: "sucesso".to_string(),
-        mensagem: "Simulações geradas com sucesso".to_string(),
+        mensagem: format!(
+            "{} simulações geradas com sucesso",
+            count
+        ),
     }))
+
 }

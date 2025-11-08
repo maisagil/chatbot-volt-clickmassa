@@ -7,6 +7,8 @@ mod auth;
 mod clients;
 mod services;
 mod utils;
+mod docs; 
+
 
 use axum::{
     body::Body,
@@ -19,6 +21,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
+use utoipa_swagger_ui::SwaggerUi;
+use utoipa::OpenApi;  
 
 #[tokio::main]
 async fn main() {
@@ -53,7 +57,7 @@ async fn main() {
     );
 
     // Testar autenticação na inicialização
-    tracing::info!("🔐 Testando autenticação com V8...");
+    tracing::info!("Testando autenticação com V8...");
     match token_manager.get_token().await {
         Ok(_) => tracing::info!("Autenticação V8 funcionando!"),
         Err(e) => {
@@ -78,9 +82,10 @@ async fn main() {
         clients::viacep_client::ViaCepClient::new(config.viacep_api_url.clone());
 
     // Construir a aplicação
-    let app = Router::new()
+     let app = Router::new()
         .merge(routes::routes())
         .nest("/api/v1", routes::v1_routes(v8_client, highconsult_client, viacep_client))
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", docs::ApiDoc::openapi()))  
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .layer(axum::middleware::from_fn(logging_middleware));

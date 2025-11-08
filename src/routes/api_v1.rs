@@ -10,7 +10,7 @@ use crate::services::{
     simulacao_service::SimulacaoService, termo_service::TermoService,
 };
 
-use super::{proposta, simulacao, termo};
+use super::{proposta, simulacao, termo, pix, cpf};
 
 pub fn v1_routes(
     v8_client: Arc<V8Client>,
@@ -26,6 +26,9 @@ pub fn v1_routes(
     ));
 
     Router::new()
+        .merge(cpf::cpf_routes(cpf::CpfState {
+            enrichment_service: enrichment_service.clone(),
+        }))
         .merge(termo::termo_routes(termo::TermoState {
             termo_service,
             enrichment_service: enrichment_service.clone(),
@@ -37,4 +40,5 @@ pub fn v1_routes(
             proposta_service,
             enrichment_service,
         }))
+        .merge(pix::pix_routes()) 
 }

@@ -4,6 +4,7 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
+use utoipa::path;
 
 use crate::error::AppResult;
 use crate::models::chatbot::{
@@ -27,23 +28,29 @@ pub fn termo_routes(state: TermoState) -> Router {
         .with_state(state)
 }
 
-/// POST /termo/criar
-/// Cria termo de autorização enriquecendo dados do CPF
+/// Criar termo de autorização
+#[utoipa::path(
+    post,
+    path = "/termo/criar",
+    request_body = CriarTermoRequest,
+    responses(
+        (status = 200, description = "Termo criado com sucesso", body = CriarTermoResponse),
+        (status = 400, description = "Erro na validação"),
+        (status = 502, description = "Erro na API V8")
+    ),
+    tag = "termo"
+)]
 async fn criar_termo(
     State(state): State<TermoState>,
     Json(payload): Json<CriarTermoRequest>,
 ) -> AppResult<Json<CriarTermoResponse>> {
-    tracing::info!("Criando termo para CPF: {}", payload.cpf);
+    tracing::info!("📝 Criando termo para CPF: {}", payload.cpf);
 
-    // 1. Validar CPF
     let cpf_limpo = cpf_validator::validate_cpf(&payload.cpf)?;
-
-    // 2. Buscar dados do CPF (HighConsult)
     let dados_pessoa = state.enrichment_service.get_person_data(&cpf_limpo).await?;
 
-    tracing::info!("Dados obtidos: {}", dados_pessoa.nome);
+    tracing::info!("✅ Dados obtidos: {}", dados_pessoa.nome);
 
-    // 3. Parsear telefone (formato: 11984353470 -> 11 + 984353470)
     let telefone_limpo = payload.telefone.chars().filter(|c| c.is_ascii_digit()).collect::<String>();
     
     let (ddd, numero) = if telefone_limpo.len() == 11 {
@@ -56,7 +63,6 @@ async fn criar_termo(
         ));
     };
 
-    // 4. Montar request do termo
     let termo_request = crate::models::v8::CreateTermoRequest {
         borrower_document_number: cpf_limpo.clone(),
         signer_name: dados_pessoa.nome.clone(),
@@ -72,14 +78,13 @@ async fn criar_termo(
             &dados_pessoa.nasc[4..6],
             &dados_pessoa.nasc[6..8]
         ),
-        gender: "male".to_string(), // TODO: determinar baseado em dados
+        gender: "male".to_string(),
         provider: "QI".to_string(),
     };
 
-    // 5. Criar termo na API V8
     let termo_response = state.termo_service.criar_termo(termo_request).await?;
 
-    tracing::info!("Termo criado com ID: {}", termo_response.id);
+    tracing::info!("✅ Termo criado com ID: {}", termo_response.id);
 
     Ok(Json(CriarTermoResponse {
         termo_id: termo_response.id,
@@ -91,38 +96,46 @@ async fn criar_termo(
     }))
 }
 
-/// POST /termo/autorizar
-/// Autoriza termo e retorna dados da consulta
+/// Autorizar termo após assinatura
+#[utoipa::path(
+    post,
+    path = "/termo/autorizar",
+    request_body = AutorizarTermoRequest,
+    responses(
+        (status = 200, description = "Termo autorizado com sucesso", body = AutorizarTermoResponse),
+        (status = 400, description = "Termo ID inválido"),
+        (status = 502, description = "Erro na API V8")
+    ),
+    tag = "termo"
+)]
 async fn autorizar_termo(
     State(state): State<TermoState>,
     Json(payload): Json<AutorizarTermoRequest>,
 ) -> AppResult<Json<AutorizarTermoResponse>> {
-    tracing::info!("Autorizando termo: {}", payload.termo_id);
+    tracing::info!("🔐 Autorizando termo: {}", payload.termo_id);
 
-    // 1. Autorizar termo
     state.termo_service.autorizar_termo(&payload.termo_id).await?;
 
-    // 2. Buscar dados da consulta
     let consult_data = state
         .termo_service
         .get_consult_data(&payload.termo_id)
         .await?;
 
     tracing::info!(
-        "Termo autorizado! Margem disponível: R$ {}",
+        "✅ Termo autorizado! Margem disponível: R$ {}",
         consult_data.margin_base_value
     );
 
-     Ok(Json(AutorizarTermoResponse {
+    Ok(Json(AutorizarTermoResponse {
         consult_id: consult_data.id,
         nome: consult_data.name,
-        margem_disponivel: consult_data.margin_base_value.clone(),  
+        margem_disponivel: consult_data.margin_base_value.clone(),
         parcelas_min: consult_data.simulation_limit.installments_min,
         parcelas_max: consult_data.simulation_limit.installments_max,
         status: consult_data.status,
         mensagem: format!(
             "Termo autorizado! Margem disponível: R$ {}",
-            consult_data.margin_base_value  
+            consult_data.margin_base_value
         ),
     }))
 }
