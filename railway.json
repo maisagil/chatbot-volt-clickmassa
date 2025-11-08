@@ -1,8 +1,10 @@
 {
   "build": {
-    "builder": "dockerfile"
+    "builder": "nixpacks"
   },
   "deploy": {
-    "startCommand": "./chatbot-volt-clickmassa"
+    "startCommand": "chmod +x /app/target/release/chatbot-volt-clickmassa && /app/target/release/chatbot-volt-clickmassa",
+    "restartPolicyType": "on_failure",
+    "restartPolicyMaxRetries": 5
   }
 }
