@@ -10,7 +10,7 @@ pub struct Config {
     pub v8_auth_url: String,
     pub v8_base_url: String,
     pub v8_client_id: String,
-    pub v8_client_secret: String,
+    pub v8_client_secret: Option<String>,
     pub v8_username: String,
     pub v8_password: String,
     pub v8_audience: String,
@@ -40,15 +40,14 @@ impl Config {
                 .parse()
                 .map_err(|_| "PORT deve ser um número".to_string())?,
             
-            // V8 - Ler direto (sem sufixo)
+            // V8
             v8_auth_url: env::var("V8_AUTH_URL")
                 .map_err(|_| "V8_AUTH_URL não configurada".to_string())?,
             v8_base_url: env::var("V8_BASE_URL")
                 .map_err(|_| "V8_BASE_URL não configurada".to_string())?,
             v8_client_id: env::var("V8_CLIENT_ID")
                 .map_err(|_| "V8_CLIENT_ID não configurada".to_string())?,
-            v8_client_secret: env::var("V8_CLIENT_SECRET")
-                .map_err(|_| "V8_CLIENT_SECRET não configurada".to_string())?,
+            v8_client_secret: env::var("V8_CLIENT_SECRET").ok(),
             v8_username: env::var("V8_USERNAME")
                 .map_err(|_| "V8_USERNAME não configurada".to_string())?,
             v8_password: env::var("V8_PASSWORD")
