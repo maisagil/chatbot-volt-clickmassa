@@ -3,8 +3,8 @@
     "builder": "nixpacks"
   },
   "deploy": {
-    "startCommand": "chmod +x /app/target/release/chatbot-volt-clickmassa && /app/target/release/chatbot-volt-clickmassa",
+    "startCommand": "chatbot-volt-clickmassa",
     "restartPolicyType": "on_failure",
-    "restartPolicyMaxRetries": 5
+    "restartPolicyMaxRetries": 3
   }
 }
