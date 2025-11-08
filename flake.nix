@@ -33,7 +33,6 @@
             clippy
             
             # Ferramentas adicionais
-            openssl
             pkg-config
             libiconv
             
