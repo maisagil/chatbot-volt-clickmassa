@@ -7,8 +7,7 @@ mod auth;
 mod clients;
 mod services;
 mod utils;
-mod docs; 
-
+mod docs;
 
 use axum::{
     body::Body,
@@ -21,12 +20,12 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
+use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-use utoipa::OpenApi;  
+use docs::ApiDoc;
 
 #[tokio::main]
 async fn main() {
-    // Carregar configuração
     let config = match config::Config::from_env() {
         Ok(c) => c,
         Err(e) => {
@@ -35,7 +34,6 @@ async fn main() {
         }
     };
 
-    // Setup logging
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::new(&config.rust_log),
@@ -46,7 +44,6 @@ async fn main() {
     tracing::info!("Ambiente: {}", config.environment);
     tracing::info!("V8 Base URL: {}", config.v8_base_url);
 
-    // Criar TokenManager
     let token_manager = auth::token_manager::TokenManager::new(
         config.v8_auth_url.clone(),
         config.v8_client_id.clone(),
@@ -56,7 +53,6 @@ async fn main() {
         config.token_cache_ttl_seconds,
     );
 
-    // Testar autenticação na inicialização
     tracing::info!("Testando autenticação com V8...");
     match token_manager.get_token().await {
         Ok(_) => tracing::info!("Autenticação V8 funcionando!"),
@@ -66,7 +62,6 @@ async fn main() {
         }
     }
 
-    // Criar clientes
     let token_manager = Arc::new(token_manager);
     let v8_client = Arc::new(clients::v8_client::V8Client::new(
         config.v8_base_url.clone(),
@@ -81,32 +76,25 @@ async fn main() {
     let viacep_client =
         clients::viacep_client::ViaCepClient::new(config.viacep_api_url.clone());
 
-        // Configurar CORS
-    let cors = if config.environment == "production" {
-        // CORS restritivo em produção
-        CorsLayer::very_permissive() // TODO: Depois fazer whitelist
-    } else {
-        // CORS permissivo em desenvolvimento
-        CorsLayer::permissive()
-    };
-
-    // Construir a aplicação
-     let app = Router::new()
+    // Construir aplicação - SwaggerUi JÁ serve o JSON automaticamente
+    let app = Router::new()
+        // SwaggerUi registra AMBOS: /swagger-ui E /api-docs/openapi.json
+        .merge(
+            SwaggerUi::new("/swagger-ui")
+                .url("/api-docs/openapi.json", ApiDoc::openapi())
+        )
         .merge(routes::routes())
         .nest("/api/v1", routes::v1_routes(v8_client, highconsult_client, viacep_client))
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", docs::ApiDoc::openapi()))  
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .layer(axum::middleware::from_fn(logging_middleware));
 
-    // Endereço do servidor
     let addr = SocketAddr::from((
         config.host.parse::<std::net::IpAddr>()
             .expect("Host inválido"),
         config.port,
     ));
 
-    // Iniciar servidor
     tracing::info!("   Servidor rodando em http://{}", addr);
     tracing::info!("   Endpoints disponíveis:");
     tracing::info!("   GET  /health");
@@ -116,6 +104,8 @@ async fn main() {
     tracing::info!("   POST /api/v1/simulacao/gerar");
     tracing::info!("   POST /api/v1/proposta/criar");
     tracing::info!("   GET  /api/v1/operacao/{{id}}");
+    tracing::info!("   SWAGGER JSON: /api-docs/openapi.json");
+    tracing::info!("   SWAGGER UI: /swagger-ui");
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await
@@ -126,7 +116,6 @@ async fn main() {
         .expect("Erro ao iniciar servidor");
 }
 
-// Middleware de logging
 async fn logging_middleware(
     req: Request<Body>,
     next: Next,
