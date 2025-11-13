@@ -76,9 +76,7 @@ async fn main() {
     let viacep_client =
         clients::viacep_client::ViaCepClient::new(config.viacep_api_url.clone());
 
-    // Construir aplicação - SwaggerUi JÁ serve o JSON automaticamente
     let app = Router::new()
-        // SwaggerUi registra AMBOS: /swagger-ui E /api-docs/openapi.json
         .merge(
             SwaggerUi::new("/swagger-ui")
                 .url("/api-docs/openapi.json", ApiDoc::openapi())
@@ -122,8 +120,6 @@ async fn logging_middleware(
 ) -> Response {
     let method = req.method().clone();
     let uri = req.uri().clone();
-
     tracing::debug!("{} {}", method, uri);
-
     next.run(req).await
 }
