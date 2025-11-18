@@ -20,7 +20,7 @@ pub struct ValidarCpfResponse {
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct CriarTermoRequest {
     pub cpf: String,
-    pub telefone: String, // formato: 11984353470
+    pub telefone: String, 
     pub email: String,
 }
 
@@ -99,7 +99,6 @@ pub struct ConsultarOperacaoResponse {
     pub mensagem: String,
 }
 
-// LEGADOS (já existentes)
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct ConsultaCpfRequest {
@@ -113,7 +112,7 @@ pub struct ConsultaCpfResponse {
     pub status: String,
 }
 
-// PROPOSTA - VERSÃO COMPLETA
+// PROPOSTA
 
 #[derive(Debug, Deserialize, Serialize, Clone, ToSchema)]
 pub struct CriarPropostaRequestCompleta {

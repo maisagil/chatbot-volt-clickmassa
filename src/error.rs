@@ -79,5 +79,4 @@ impl IntoResponse for AppError {
     }
 }
 
-// Type alias para Result com AppError
 pub type AppResult<T> = Result<T, AppError>;
